@@ -1,6 +1,7 @@
-# notebooks
-collection of my jupyter notebooks
+Collection of my implementation of reinforcement learning algorithms
 
-[This folder](https://github.com/xysun/notebooks/tree/master/reinforcement%20learning) has my notebooks on reinforcement learning algorithms described in:
-- [Sutton's book](https://mitpress.mit.edu/books/reinforcement-learning-second-edition)
-- [David Silver's lecture](http://www0.cs.ucl.ac.uk/staff/d.silver/web/Teaching.html)
+In reverse chronological order:
+
+- [Sarsa(WIP)](https://github.com/xysun/rl-algorithms/blob/master/sarsa.py)
+- [Monte Carlo Prediction & Control with Exploring Starts](https://github.com/xysun/rl-algorithms/blob/master/Monte-Carlo-Prediction-and-Control-with-Exploring-Starts.ipynb)
+- [Policy evaluation & iteration, value iteration](https://github.com/xysun/rl-algorithms/blob/master/Policy-evaluation-Policy-iteration-and-Value-Iteration.ipynb)
