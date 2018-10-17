@@ -1,5 +1,5 @@
 '''
-Solve FrozenLake-v0 with Sarsa
+Solve FrozenLake-v0 with Q-Learning
 
 Hyperparameters:
 - alpha
@@ -10,9 +10,8 @@ Steps:
 - set pi to be episilon-soft, with episilon = 0.1
 - for each step S of episode:
     - take A from argmax(Q(S)) with episilon-soft, observe R, S'
-    - choose A' from argmax(Q(S')) with episilon-soft
-    - Q(S,A) <- Q(S,A) + alpha * (R + lambda * Q(S',A') - Q(S,A))
-    - S <- S', A <- A'
+    - Q(S,A) <- Q(S,A) + alpha * (R + lambda * max(Q(S',a)) - Q(S,A))
+    - S <- S'; NOTE: we do not update A
     - until S is terminal
 - repeat until Q converges
 - render final policy with no episilon-soft, this should solve the environment
@@ -38,18 +37,17 @@ def train(env, q, hyper_parameters, debug=False):
 
     for i in range(int(1e5)):
         s = env.reset()
-        a = episilon_greedy_policy(q, s)
         total_update = 0
         while True:
+            a = episilon_greedy_policy(q, s)
             s_prime, reward, done, info = env.step(a)
             if done:
                 q[s_prime][:] = 0
-            a_prime = episilon_greedy_policy(q, s_prime)
-            q_update = alpha * (reward + discount*q[s_prime][a_prime] - q[s][a])
+            max_q = np.max(q[s_prime])
+            q_update = alpha * (reward + discount*max_q - q[s][a])
             total_update += q_update
             q[s][a] += q_update
             s = s_prime
-            a = a_prime
             if done:
                 if i % int(1e4) == 0 and debug:
                     print("episode %d, total update %f" % (i, total_update))
@@ -79,23 +77,22 @@ if __name__ == '__main__':
 
 '''
 Sample output: 
-Episode finished after 59 timesteps
+Episode finished after 13 timesteps
 Final reward 1.0
-Final Q: 
-[[0.14733252 0.12346447 0.11584345 0.11158805]
- [0.0664431  0.08236323 0.07721741 0.10849282]
- [0.12945809 0.1057834  0.08920052 0.09945042]
- [0.0876511  0.08314306 0.06264262 0.10165838]
- [0.15286886 0.08983397 0.09984534 0.08871989]
+Final Q: [[0.48686972 0.         0.2210633  0.14866253]
+ [0.35226475 0.21856292 0.36125896 0.59094109]
+ [0.50832806 0.39312108 0.34535931 0.37701777]
+ [0.20845344 0.03684925 0.05642082 0.07237555]
+ [0.58567865 0.53386665 0.43186359 0.5173467 ]
  [0.         0.         0.         0.        ]
- [0.0954803  0.09900505 0.09994057 0.02226198]
+ [0.21221457 0.18339856 0.45453052 0.12886953]
  [0.         0.         0.         0.        ]
- [0.06946377 0.07777983 0.03553089 0.19449307]
- [0.22746631 0.3727177  0.18622745 0.21365838]
- [0.43272015 0.30182448 0.14616152 0.15673924]
+ [0.58075784 0.61196707 0.50082677 0.6869848 ]
+ [0.54662029 0.73901902 0.50072503 0.49434762]
+ [0.68664874 0.50387436 0.45450302 0.30514138]
  [0.         0.         0.         0.        ]
  [0.         0.         0.         0.        ]
- [0.2728878  0.39933574 0.49003632 0.30993405]
- [0.56562515 0.65064389 0.69843132 0.59741935]
+ [0.61036222 0.79938585 0.84821566 0.47519609]
+ [0.76289985 0.91838441 0.90746685 0.83933814]
  [0.         0.         0.         0.        ]]
 '''

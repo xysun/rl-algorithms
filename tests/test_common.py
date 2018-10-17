@@ -2,10 +2,10 @@ import unittest
 
 import numpy as np
 
-from sarsa import episilon_greedy_policy
+from common.policies import episilon_greedy_policy
 
 
-class TestSarsaModule(unittest.TestCase):
+class TestCommonModule(unittest.TestCase):
 
     def test_episilon_greedy_policy(self):
 
