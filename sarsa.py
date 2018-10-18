@@ -3,19 +3,19 @@ Solve FrozenLake-v0 with Sarsa
 
 Hyperparameters:
 - alpha
-- episilon in episilon-soft policy
+- epsilon in epsilon-soft policy
 
 Steps:
 - initialize all Q(S,A) to 0; initialize hyper parameters
-- set pi to be episilon-soft, with episilon = 0.1
+- set pi to be epsilon-soft, with epsilon = 0.1
 - for each step S of episode:
-    - take A from argmax(Q(S)) with episilon-soft, observe R, S'
-    - choose A' from argmax(Q(S')) with episilon-soft
+    - take A from argmax(Q(S)) with epsilon-soft, observe R, S'
+    - choose A' from argmax(Q(S')) with epsilon-soft
     - Q(S,A) <- Q(S,A) + alpha * (R + lambda * Q(S',A') - Q(S,A))
     - S <- S', A <- A'
     - until S is terminal
 - repeat until Q converges
-- render final policy with no episilon-soft, this should solve the environment
+- render final policy with no epsilon-soft, this should solve the environment
 '''
 
 import random
@@ -23,7 +23,7 @@ import random
 import gym
 import numpy as np
 
-from common.policies import episilon_greedy_policy
+from common.policies import epsilon_greedy_policy
 
 def train(env, q, hyper_parameters, debug=False):
     '''
@@ -38,13 +38,13 @@ def train(env, q, hyper_parameters, debug=False):
 
     for i in range(int(1e5)):
         s = env.reset()
-        a = episilon_greedy_policy(q, s)
+        a = epsilon_greedy_policy(q, s)
         total_update = 0
         while True:
             s_prime, reward, done, info = env.step(a)
             if done:
                 q[s_prime][:] = 0
-            a_prime = episilon_greedy_policy(q, s_prime)
+            a_prime = epsilon_greedy_policy(q, s_prime)
             q_update = alpha * (reward + discount*q[s_prime][a_prime] - q[s][a])
             total_update += q_update
             q[s][a] += q_update
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     observation = env.reset()
     for t in range(100):
         env.render()
-        action = episilon_greedy_policy(q, observation, greedy=True)
+        action = epsilon_greedy_policy(q, observation, greedy=True)
         observation, reward, done, info = env.step(action)
         if done:
             print("Episode finished after {} timesteps".format(t+1))

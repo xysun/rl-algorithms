@@ -3,18 +3,18 @@ Solve FrozenLake-v0 with Q-Learning
 
 Hyperparameters:
 - alpha
-- episilon in episilon-soft policy
+- epsilon in epsilon-soft policy
 
 Steps:
 - initialize all Q(S,A) to 0; initialize hyper parameters
-- set pi to be episilon-soft, with episilon = 0.1
+- set pi to be epsilon-soft, with epsilon = 0.1
 - for each step S of episode:
-    - take A from argmax(Q(S)) with episilon-soft, observe R, S'
+    - take A from argmax(Q(S)) with epsilon-soft, observe R, S'
     - Q(S,A) <- Q(S,A) + alpha * (R + lambda * max(Q(S',a)) - Q(S,A))
     - S <- S'; NOTE: we do not update A
     - until S is terminal
 - repeat until Q converges
-- render final policy with no episilon-soft, this should solve the environment
+- render final policy with no epsilon-soft, this should solve the environment
 '''
 
 import random
@@ -22,7 +22,7 @@ import random
 import gym
 import numpy as np
 
-from common.policies import episilon_greedy_policy
+from common.policies import epsilon_greedy_policy
 
 def train(env, q, hyper_parameters, debug=False):
     '''
@@ -39,7 +39,7 @@ def train(env, q, hyper_parameters, debug=False):
         s = env.reset()
         total_update = 0
         while True:
-            a = episilon_greedy_policy(q, s)
+            a = epsilon_greedy_policy(q, s)
             s_prime, reward, done, info = env.step(a)
             if done:
                 q[s_prime][:] = 0
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     observation = env.reset()
     for t in range(100):
         env.render()
-        action = episilon_greedy_policy(q, observation, greedy=True)
+        action = epsilon_greedy_policy(q, observation, greedy=True)
         observation, reward, done, info = env.step(action)
         if done:
             print("Episode finished after {} timesteps".format(t+1))
