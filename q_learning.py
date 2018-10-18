@@ -1,7 +1,7 @@
 '''
 Solve FrozenLake-v0 with Q-Learning with minimum 6 steps
 
-Observe that it converges much faster than Sarsa
+Observe that it finds shortest path way faster than Sarsa, as Q-learning is "optimistic"
 
 Hyperparameters:
 - alpha
@@ -38,29 +38,34 @@ def train(env, q, hyper_parameters, debug=False):
     alpha = hyper_parameters['alpha']
     discount = hyper_parameters['discount']
 
-    iterations = 1e4
     starting_epsilon = 1 / env.action_space.n # important that we start being very exploratory
     epsilon_decay_steps = 10.
     epsilon_decay = starting_epsilon / epsilon_decay_steps
 
-    for i in range(int(iterations)):
-        s = env.reset()
-        total_update = 0
-        epsilon = starting_epsilon - (int(i/(iterations/epsilon_decay_steps)) * epsilon_decay)
-        while True:
-            a = epsilon_greedy_policy(q, s, epsilon=epsilon)
-            s_prime, reward, done, info = env.step(a)
-            if done:
-                q[s_prime][:] = 0
-            max_q = np.max(q[s_prime])
-            q_update = alpha * (reward + discount*max_q - q[s][a])
-            total_update += q_update
-            q[s][a] += q_update
-            s = s_prime
-            if done:
-                if i % int(iterations/epsilon_decay_steps) == 0 and debug:
-                    print("episode %d, total update %f, epsilon %f" % (i, total_update, epsilon))
-                break
+    timesteps = 1e4
+    episodes = 0
+
+    s = env.reset()
+    total_update = 0
+
+    for i in range(int(timesteps)):
+        epsilon = starting_epsilon - (int(i / (timesteps / epsilon_decay_steps)) * epsilon_decay)
+        a = epsilon_greedy_policy(q, s, epsilon=epsilon)
+        s_prime, reward, done, info = env.step(a)
+        if done:
+            q[s_prime][:] = 0
+        max_q = np.max(q[s_prime])
+        q_update = alpha * (reward + discount*max_q - q[s][a])
+        total_update += q_update
+        q[s][a] += q_update
+        s = s_prime
+        if done:
+            # start a new episode
+            episodes += 1
+            s = env.reset()
+            total_update = 0
+
+    print("training complete, total episodes %d " % (episodes))
     return q
 
 if __name__ == '__main__':
