@@ -1,5 +1,5 @@
 '''
-Solve FrozenLake-v0 with Q-Learning
+Solve FrozenLake-v0 with Q-Learning with minimum 6 steps
 
 Observe that it converges much faster than Sarsa
 
@@ -39,7 +39,7 @@ def train(env, q, hyper_parameters, debug=False):
     discount = hyper_parameters['discount']
 
     iterations = 1e4
-    starting_epsilon = 1 / env.action_space.n
+    starting_epsilon = 1 / env.action_space.n # important that we start being very exploratory
     epsilon_decay_steps = 10.
     epsilon_decay = starting_epsilon / epsilon_decay_steps
 
