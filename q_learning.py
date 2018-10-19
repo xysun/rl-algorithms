@@ -1,8 +1,6 @@
 '''
 Solve FrozenLake-v0 with Q-Learning with minimum 6 steps
 
-Observe that it finds shortest path way faster than Sarsa, as Q-learning is "optimistic"
-
 Hyperparameters:
 - alpha
 - epsilon in epsilon-soft policy
