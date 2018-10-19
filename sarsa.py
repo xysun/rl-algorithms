@@ -24,7 +24,7 @@ import gym
 from gym.envs.registration import register
 import numpy as np
 
-from common.policies import epsilon_greedy_policy
+from common.policies import *
 
 def train(env, q, hyper_parameters, debug=False):
     '''
@@ -39,18 +39,16 @@ def train(env, q, hyper_parameters, debug=False):
 
     timesteps = 1e4
     starting_epsilon = 1 / env.action_space.n # important that we start being very exploratory
-    epsilon_decay_steps = 10.
-    epsilon_decay = starting_epsilon / epsilon_decay_steps
 
     s = env.reset()
     episodes = 0
     total_update = 0
 
-    epsilon = starting_epsilon
+    epsilon = epsilon_decay(starting_epsilon, timesteps, 0)
     a = epsilon_greedy_policy(q, s, epsilon=epsilon)
 
-    for i in range(int(timesteps)):
-        epsilon = starting_epsilon - (int(i / (timesteps / epsilon_decay_steps)) * epsilon_decay)
+    for i in range(1, int(timesteps+1)):
+        epsilon = epsilon_decay(starting_epsilon, timesteps, i)
         s_prime, reward, done, info = env.step(a)
         if done:
             q[s_prime][:] = 0
@@ -66,7 +64,7 @@ def train(env, q, hyper_parameters, debug=False):
             total_update = 0
             episodes += 1
 
-    print("training done; total episodes %i" % (episodes)) # 1406
+    print("training done; total episodes %i, final update %f" % (episodes, total_update)) # 1406
     return q
 
 if __name__ == '__main__':
@@ -88,7 +86,8 @@ if __name__ == '__main__':
         if done:
             print("Episode finished after {} timesteps".format(t+1))
             print("Final reward {}".format(reward))
-            print("Final Q:", q)
+            print("Final Q:")
+            print(q)
             break
 
 '''
