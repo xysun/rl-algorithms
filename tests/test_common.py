@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from common.policies import epsilon_greedy_policy
+from common.policies import *
 
 
 class TestCommonModule(unittest.TestCase):
@@ -37,3 +37,8 @@ class TestCommonModule(unittest.TestCase):
         ])
 
         self.assertEqual(epsilon_greedy_policy(q, observation=0, greedy=True), 3)
+
+    def test_epsilon_decay(self):
+        self.assertAlmostEqual(epsilon_decay(starting_epsilon=0.1, iterations=100, i=1), 0.1)
+        self.assertAlmostEqual(epsilon_decay(starting_epsilon=0.1, iterations=100, i=11), 0.09)
+        self.assertAlmostEqual(epsilon_decay(starting_epsilon=0.1, iterations=100, i=100), 0)

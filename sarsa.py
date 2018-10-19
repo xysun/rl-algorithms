@@ -24,7 +24,7 @@ import gym
 from gym.envs.registration import register
 import numpy as np
 
-from common.policies import epsilon_greedy_policy
+from common.policies import *
 
 def train(env, q, hyper_parameters, debug=False):
     '''
@@ -37,30 +37,34 @@ def train(env, q, hyper_parameters, debug=False):
     alpha = hyper_parameters['alpha']
     discount = hyper_parameters['discount']
 
-    iterations = 1e4
+    timesteps = 1e4
     starting_epsilon = 1 / env.action_space.n # important that we start being very exploratory
-    epsilon_decay_steps = 10.
-    epsilon_decay = starting_epsilon / epsilon_decay_steps
 
-    for i in range(int(iterations)):
-        s = env.reset()
-        epsilon = starting_epsilon - (int(i / (iterations / epsilon_decay_steps)) * epsilon_decay)
-        a = epsilon_greedy_policy(q, s, epsilon=epsilon)
-        total_update = 0
-        while True:
-            s_prime, reward, done, info = env.step(a)
-            if done:
-                q[s_prime][:] = 0
-            a_prime = epsilon_greedy_policy(q, s_prime, epsilon=epsilon)
-            q_update = alpha * (reward + discount*q[s_prime][a_prime] - q[s][a])
-            total_update += q_update
-            q[s][a] += q_update
-            s = s_prime
-            a = a_prime
-            if done:
-                if i % int(iterations/epsilon_decay_steps) == 0 and debug:
-                    print("episode %d, total update %f, epsilon %f" % (i, total_update, epsilon))
-                break
+    s = env.reset()
+    episodes = 0
+    total_update = 0
+
+    epsilon = epsilon_decay(starting_epsilon, timesteps, 0)
+    a = epsilon_greedy_policy(q, s, epsilon=epsilon)
+
+    for i in range(1, int(timesteps+1)):
+        epsilon = epsilon_decay(starting_epsilon, timesteps, i)
+        s_prime, reward, done, info = env.step(a)
+        if done:
+            q[s_prime][:] = 0
+        a_prime = epsilon_greedy_policy(q, s_prime, epsilon=epsilon)
+        q_update = alpha * (reward + discount*q[s_prime][a_prime] - q[s][a])
+        total_update += q_update
+        q[s][a] += q_update
+        s = s_prime
+        a = a_prime
+        if done:
+            s = env.reset()
+            a = epsilon_greedy_policy(q, s, epsilon=epsilon)
+            total_update = 0
+            episodes += 1
+
+    print("training done; total episodes %i, final update %f" % (episodes, total_update)) # 1406
     return q
 
 if __name__ == '__main__':
@@ -82,7 +86,8 @@ if __name__ == '__main__':
         if done:
             print("Episode finished after {} timesteps".format(t+1))
             print("Final reward {}".format(reward))
-            print("Final Q:", q)
+            print("Final Q:")
+            print(q)
             break
 
 '''
