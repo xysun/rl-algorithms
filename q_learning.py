@@ -17,11 +17,8 @@ Steps:
 - render final policy with no epsilon-soft, this should solve the environment
 '''
 
-import random
-
 import gym
 from gym.envs.registration import register
-import numpy as np
 
 from common.policies import *
 
