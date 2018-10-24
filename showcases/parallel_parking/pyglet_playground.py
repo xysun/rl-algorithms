@@ -11,10 +11,10 @@ We want to:
 assume constant velocity for both angular and motion
 
 TODO: 
-- R should be calculated from top wheel position, instead of top_left/top_right
+- R should be calculated from top wheel position, instead of top_left/top_right (right now we reduce turning_radius as a crude approx)
+- update steering continuously while moving (pyglet's key "motion")
 - to avoid errors between meter and pixels, make them different types
 - tests
-- update steering continuously while moving (pyglet's key "motion")
 - collision detection
 - parking success detection
 - openai gym integration
@@ -25,10 +25,10 @@ w = 480
 h = 640
 
 # file:///Users/xiayunsun/Downloads/golf-vii-pa-dimensions.pdf
-golf_h = 4
+golf_h = 4.3
 golf_w = 2
 golf_wheelbase = 2.6
-golf_turning_circle = 8 / 2 # todo: i believe in spec it's 2*pi*r, need to find out
+golf_turning_radius = 9 / 2  # adjust for things like we do not model the wheels exactly
 
 car_h = 160
 pixel_to_meter = car_h / golf_h
@@ -94,7 +94,7 @@ class CarState:
 
         self.center = Point(self.x, self.y)
 
-        self.v_in_meters = 5 * 1600 / 3600.  # 5 miles per hour
+        self.v_in_meters = 3 * 1600 / 3600.  # 5 miles per hour
         self.v = car_h / (golf_h / self.v_in_meters)
         print("velocity: ", self.v_in_meters, self.v)
         self.orientation = 0  # radius, left is positive
@@ -146,11 +146,11 @@ class CarState:
                 radius = control.psi / 180. * math.pi
                 R = self._wheel_base / (math.sin(radius))
                 # print(R / pixel_to_meter)
-                if abs(R) < golf_turning_circle * pixel_to_meter:
+                if abs(R) < golf_turning_radius * pixel_to_meter:
                     if R > 0:
-                        R = golf_turning_circle * pixel_to_meter
+                        R = golf_turning_radius * pixel_to_meter
                     else:
-                        R = -golf_turning_circle * pixel_to_meter
+                        R = -golf_turning_radius * pixel_to_meter
                 # print(R / pixel_to_meter)
                 omega = self.v / R
                 if control.forward:
