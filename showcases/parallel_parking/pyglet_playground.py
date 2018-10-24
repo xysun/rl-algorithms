@@ -11,7 +11,10 @@ We want to:
 assume constant velocity for both angular and motion
 
 TODO: 
-- update steering continuously while moving
+- R should be calculated from top wheel position, instead of top_left/top_right
+- to avoid errors between meter and pixels, make them different types
+- tests
+- update steering continuously while moving (pyglet's key "motion")
 - collision detection
 - parking success detection
 - openai gym integration
@@ -22,10 +25,10 @@ w = 480
 h = 640
 
 # file:///Users/xiayunsun/Downloads/golf-vii-pa-dimensions.pdf
-golf_h = 4.3
+golf_h = 4
 golf_w = 2
 golf_wheelbase = 2.6
-golf_turning_circle = 10.9 / 2
+golf_turning_circle = 8 / 2 # todo: i believe in spec it's 2*pi*r, need to find out
 
 car_h = 160
 pixel_to_meter = car_h / golf_h
