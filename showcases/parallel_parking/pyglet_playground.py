@@ -11,14 +11,14 @@ We want to:
 assume constant velocity for both angular and motion
 
 TODO: 
-- R should be calculated from top wheel position, instead of top_left/top_right (right now we reduce turning_radius as a crude approx)
-- update steering continuously while moving (pyglet's key "motion")
+- [DONE] R should be calculated from top wheel position, instead of top_left/top_right (right now we reduce turning_radius as a crude approx)
+- [DONE] update steering continuously while moving (pyglet's key "motion")
+- tests & refactoring
 - to avoid errors between meter and pixels, make them different types
-- tests
 - collision detection
 - parking success detection
 - openai gym integration
-- draw fancy cars
+- [OPTIONAL] draw fancy cars
 '''
 
 w = 480
@@ -48,6 +48,12 @@ class Point:
     def __sub__(self, other):
         return Point(self.x - other.x, self.y - other.y)
 
+    def rotate(self, theta):
+        # counter-clockwise; assuming subtracted reference point already
+        x = math.cos(theta) * self.x - math.sin(theta) * self.y
+        y = math.sin(theta) * self.x + math.cos(theta) * self.y
+        return Point(x, y)
+
 
 class CarControl:
     def __init__(self):
@@ -57,16 +63,6 @@ class CarControl:
 
     def __str__(self):
         return "driving: %s, forward: %s, turning: %s" % (self.drive, self.forward, self.psi)
-
-
-def rotate(point: Point, theta):
-    '''
-    counter-clockwise; rotate w.r.t origin
-    '''
-    x_new = math.cos(theta) * point.x - math.sin(theta) * point.y
-    y_new = math.sin(theta) * point.x + math.cos(theta) * point.y
-
-    return Point(x_new, y_new)
 
 
 def drive_straight(point: Point, orientation, distance, forward: bool):
@@ -114,10 +110,10 @@ class CarState:
         self.turning_center = None
 
     def from_center(self):
-        self.bottom_left = rotate(self.bottom_left_offset, self.orientation) + self.center
-        self.top_left = rotate(self.top_left_offset, self.orientation) + self.center
-        self.top_right = rotate(self.top_right_offset, self.orientation) + self.center
-        self.bottom_right = rotate(self.bottom_right_offset, self.orientation) + self.center
+        self.bottom_left = self.bottom_left_offset.rotate(self.orientation) + self.center
+        self.top_left = self.top_left_offset.rotate(self.orientation) + self.center
+        self.top_right = self.top_right_offset.rotate(self.orientation) + self.center
+        self.bottom_right = self.bottom_right_offset.rotate(self.orientation) + self.center
 
     def update_vertices(self, control: CarControl, dt=None):
 
@@ -178,7 +174,7 @@ class CarState:
 
                 # only rotate the middle point
                 # works for left turn only
-                self.center = rotate(self.center - self.turning_center, theta) + self.turning_center
+                self.center = (self.center - self.turning_center).rotate(theta) + self.turning_center
                 self.from_center()
 
         l = [
@@ -204,10 +200,10 @@ def run():
     # draw 2 parked cars
     batch.add_indexed(4, pyglet.gl.GL_TRIANGLES, None,
                       [0, 1, 2, 0, 2, 3],
-                      ('v2i', (offset, offset + 3 * car_h,
-                               offset, offset + 4 * car_h,
-                               offset + car_w, offset + 4 * car_h,
-                               offset + car_w, offset + 3 * car_h))
+                      ('v2i', (offset, int(offset + 3 * car_h),
+                               offset, int(offset + 4 * car_h),
+                               offset + car_w, int(offset + 4 * car_h),
+                               offset + car_w, int(offset + 3 * car_h)))
                       )
     batch.add_indexed(4, pyglet.gl.GL_TRIANGLES, None,
                       [0, 1, 2, 0, 2, 3],
@@ -226,11 +222,10 @@ def run():
 
     # draw a small rectangle represent wheel direction
     steering_vertices = batch.add_indexed(2, pyglet.gl.GL_LINES, None,
-                                          [0,1],
-                                          ('v2i', (400,600,
-                                                   400,540
-                                          )))
-
+                                          [0, 1],
+                                          ('v2i', (400, 600,
+                                                   400, 540
+                                                   )))
 
     @window.event
     def on_key_press(symbol, modifiers):
@@ -242,7 +237,7 @@ def run():
             window.control.drive = not window.control.drive
         elif symbol == pyglet.window.key.UP:
             window.control.psi = 0
-            steering_vertices.vertices = [400,600,400,540]
+            steering_vertices.vertices = [400, 600, 400, 540]
             window.clear()
             batch.draw()
 
@@ -251,15 +246,15 @@ def run():
     @window.event
     def on_text_motion(motion):
         if motion == pyglet.window.key.MOTION_LEFT:
-            window.control.psi = min(60, window.control.psi + 10)
+            window.control.psi = min(52, window.control.psi + 10)
         elif motion == pyglet.window.key.MOTION_RIGHT:
-            window.control.psi = max(-60, window.control.psi - 10)
+            window.control.psi = max(-52, window.control.psi - 10)
 
         print("current control:", window.control)
         window.clear()
         r = window.control.psi / 180. * math.pi
-        p1 = rotate(Point(0,30), r) + Point(400,570)
-        p2 = rotate(Point(0,-30), r) + Point(400, 570)
+        p1 = Point(0, 30).rotate(r) + Point(400, 570)
+        p2 = Point(0, -30).rotate(r) + Point(400, 570)
         steering_vertices.vertices = [int(e) for e in [p1.x, p1.y, p2.x, p2.y]]
         batch.draw()
 
