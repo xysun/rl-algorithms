@@ -94,7 +94,7 @@ class CarState:
 
         self.center = Point(self.x, self.y)
 
-        self.v_in_meters = 3 * 1600 / 3600.  # 5 miles per hour
+        self.v_in_meters = 2 * 1600 / 3600.  # 5 miles per hour
         self.v = car_h / (golf_h / self.v_in_meters)
         print("velocity: ", self.v_in_meters, self.v)
         self.orientation = 0  # radius, left is positive
@@ -225,6 +225,12 @@ def run():
                                      )
 
     # draw a small rectangle represent wheel direction
+    steering_vertices = batch.add_indexed(2, pyglet.gl.GL_LINES, None,
+                                          [0,1],
+                                          ('v2i', (400,600,
+                                                   400,540
+                                          )))
+
 
     @window.event
     def on_key_press(symbol, modifiers):
@@ -234,15 +240,28 @@ def run():
             window.control.forward = False
         elif symbol == pyglet.window.key.D:
             window.control.drive = not window.control.drive
-        # todo: continuously update psi
-        elif symbol == pyglet.window.key.LEFT:
-            window.control.psi = 60
-        elif symbol == pyglet.window.key.RIGHT:
-            window.control.psi = -60
         elif symbol == pyglet.window.key.UP:
             window.control.psi = 0
+            steering_vertices.vertices = [400,600,400,540]
+            window.clear()
+            batch.draw()
+
+        # print("current control:", window.control)
+
+    @window.event
+    def on_text_motion(motion):
+        if motion == pyglet.window.key.MOTION_LEFT:
+            window.control.psi = min(60, window.control.psi + 10)
+        elif motion == pyglet.window.key.MOTION_RIGHT:
+            window.control.psi = max(-60, window.control.psi - 10)
 
         print("current control:", window.control)
+        window.clear()
+        r = window.control.psi / 180. * math.pi
+        p1 = rotate(Point(0,30), r) + Point(400,570)
+        p2 = rotate(Point(0,-30), r) + Point(400, 570)
+        steering_vertices.vertices = [int(e) for e in [p1.x, p1.y, p2.x, p2.y]]
+        batch.draw()
 
     def update(dt):
         '''
@@ -253,6 +272,7 @@ def run():
         window.clear()  # important
         car_vertices.vertices = window.car.update_vertices(window.control, dt)
         batch.draw()
+        # print("current control:", window.control)
 
     pyglet.clock.schedule_interval(update, 0.05)
 
