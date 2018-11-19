@@ -2,6 +2,8 @@ import math
 
 import pyglet
 
+from .point import Point2D
+
 '''
 pyglet works with opengl without any other libs
 
@@ -17,7 +19,14 @@ TODO:
 - to avoid errors between meter and pixels, make them different types
 - collision detection
 - parking success detection
+    - parallel
+    - distance <= epsilon
 - openai gym integration
+    - action vector: [driving, forward, steering]
+    - state vector: 
+        - image itself
+        - center coordinates
+        - simulate radar in real life
 - [OPTIONAL] draw fancy cars
 '''
 
@@ -37,24 +46,6 @@ car_w = int(golf_w * pixel_to_meter)
 offset = int(0.2 * pixel_to_meter)
 
 
-class Point:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
-    def __add__(self, other):
-        return Point(self.x + other.x, self.y + other.y)
-
-    def __sub__(self, other):
-        return Point(self.x - other.x, self.y - other.y)
-
-    def rotate(self, theta):
-        # counter-clockwise; assuming subtracted reference point already
-        x = math.cos(theta) * self.x - math.sin(theta) * self.y
-        y = math.sin(theta) * self.x + math.cos(theta) * self.y
-        return Point(x, y)
-
-
 class CarControl:
     def __init__(self):
         self.drive = False
@@ -63,19 +54,6 @@ class CarControl:
 
     def __str__(self):
         return "driving: %s, forward: %s, turning: %s" % (self.drive, self.forward, self.psi)
-
-
-def drive_straight(point: Point, orientation, distance, forward: bool):
-    if forward:
-        return Point(
-            point.x - distance * math.sin(orientation),
-            point.y + distance * math.cos(orientation)
-        )
-    else:
-        return Point(
-            point.x + distance * math.sin(orientation),
-            point.y - distance * math.cos(orientation)
-        )
 
 
 class CarState:
@@ -88,7 +66,7 @@ class CarState:
         self.x = 3 * offset + 1.5 * self._w
         self.y = offset + 3.5 * self._h
 
-        self.center = Point(self.x, self.y)
+        self.center = Point2D(self.x, self.y)
 
         self.v_in_meters = 2 * 1600 / 3600.  # 5 miles per hour
         self.v = car_h / (golf_h / self.v_in_meters)
@@ -96,10 +74,10 @@ class CarState:
         self.orientation = 0  # radius, left is positive
 
         # anchor positions, offsets are constant
-        self.bottom_left_offset = Point(- 0.5 * self._w, - 0.5 * self._h)
-        self.top_left_offset = Point(- 0.5 * self._w, + 0.5 * self._h)
-        self.top_right_offset = Point(+ 0.5 * self._w, + 0.5 * self._h)
-        self.bottom_right_offset = Point(0.5 * self._w, - 0.5 * self._h)
+        self.bottom_left_offset = Point2D(- 0.5 * self._w, - 0.5 * self._h)
+        self.top_left_offset = Point2D(- 0.5 * self._w, + 0.5 * self._h)
+        self.top_right_offset = Point2D(+ 0.5 * self._w, + 0.5 * self._h)
+        self.bottom_right_offset = Point2D(0.5 * self._w, - 0.5 * self._h)
 
         self.bottom_left = self.center + self.bottom_left_offset
         self.top_left = self.center + self.top_left_offset
@@ -110,10 +88,10 @@ class CarState:
         self.turning_center = None
 
     def from_center(self):
-        self.bottom_left = self.bottom_left_offset.rotate(self.orientation) + self.center
-        self.top_left = self.top_left_offset.rotate(self.orientation) + self.center
-        self.top_right = self.top_right_offset.rotate(self.orientation) + self.center
-        self.bottom_right = self.bottom_right_offset.rotate(self.orientation) + self.center
+        self.bottom_left = Point2D.rotate(self.bottom_left_offset, self.orientation) + self.center
+        self.top_left = Point2D.rotate(self.top_left_offset, self.orientation) + self.center
+        self.top_right = Point2D.rotate(self.top_right_offset, self.orientation) + self.center
+        self.bottom_right = Point2D.rotate(self.bottom_right_offset, self.orientation) + self.center
 
     def update_vertices(self, control: CarControl, dt=None):
 
@@ -132,8 +110,8 @@ class CarState:
                     # follow orientation
                     s = self.v * dt
                     # print("orientation: ", self.orientation)
-                    self.center = drive_straight(self.center, orientation=self.orientation, distance=s,
-                                                 forward=control.forward)
+                    self.center.move(orientation=self.orientation, distance=s,
+                                     forward=control.forward)
                     self.from_center()
 
             # rotate according to control.psi
@@ -159,12 +137,12 @@ class CarState:
                 # center should only change when steering angle changed
                 if control.psi != self.last_psi and control.psi != 0:
                     if control.psi > 0:  # left
-                        self.turning_center = Point(
+                        self.turning_center = Point2D(
                             x=self.top_left.x - R * math.cos(radius),
                             y=self.top_left.y - R * math.sin(radius)
                         )
                     else:  # right
-                        self.turning_center = Point(
+                        self.turning_center = Point2D(
                             x=self.top_right.x - R * math.cos(radius),
                             y=self.top_right.y - R * math.sin(radius)
                         )
@@ -173,8 +151,7 @@ class CarState:
                 # print(self.turning_center.x, self.turning_center.y)
 
                 # only rotate the middle point
-                # works for left turn only
-                self.center = (self.center - self.turning_center).rotate(theta) + self.turning_center
+                self.center = Point2D.rotate(self.center - self.turning_center, theta) + self.turning_center
                 self.from_center()
 
         l = [
@@ -253,8 +230,8 @@ def run():
         print("current control:", window.control)
         window.clear()
         r = window.control.psi / 180. * math.pi
-        p1 = Point(0, 30).rotate(r) + Point(400, 570)
-        p2 = Point(0, -30).rotate(r) + Point(400, 570)
+        p1 = Point2D.rotate(Point2D(0, 30), r) + Point2D(400, 570)
+        p2 = Point2D.rotate(Point2D(0, -30), r) + Point2D(400, 570)
         steering_vertices.vertices = [int(e) for e in [p1.x, p1.y, p2.x, p2.y]]
         batch.draw()
 
