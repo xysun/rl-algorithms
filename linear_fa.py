@@ -34,12 +34,17 @@ from common.tile_encoding import TileEncoder
 
 def derive_features(observation, action):
     env_features = tile_encoder.encode(observation[0], observation[1])
-    action_features = action_encoder.transform([[action]]).toarray()[0]
+    empty_features = np.full(env_features.flatten().shape, 0)
 
-    return np.concatenate((env_features.flatten(), action_features))
+    if action == 0:
+        return np.concatenate((env_features.flatten(), empty_features, empty_features))
+    elif action == 1:
+        return np.concatenate((empty_features, env_features.flatten(), empty_features))
+    else:
+        return np.concatenate((empty_features, empty_features, env_features.flatten()))
 
 
-env = gym.make('MountainCar-v0')
+env = gym.make('MountainCar-v0').env # to bypass 200 step limit
 
 os = env.observation_space
 tile_encoder = TileEncoder(
@@ -47,7 +52,7 @@ tile_encoder = TileEncoder(
     lower_y=os.low[1],
     upper_x=os.high[0],
     upper_y=os.high[1],
-    n=4,
+    n=8,
     tile_offsets=[]
 )
 
@@ -56,7 +61,7 @@ action_encoder.fit([[0], [1], [2]])
 
 observation = env.reset()
 
-weights = np.full(tile_encoder.d + env.action_space.n, 0.01)
+weights = np.full(tile_encoder.d * env.action_space.n, 0.01)
 alpha = 0.1
 gamma = 1
 
@@ -67,17 +72,22 @@ def q(weights, observation, action):
     return np.dot(weights, features)
 
 
-def epsilon_greedy(weights, observation):
+def epsilon_greedy(weights, observation, greedy = False):
     q_values = [q(weights, observation, action) for action in [0, 1, 2]]
-    epsilon = 0.2
+    epsilon = 0.1
+
     most_greedy_action: int = np.argmax(q_values)
+
+    if greedy:
+        return most_greedy_action
+
     probs = [epsilon] * 3
     probs[most_greedy_action] += 1 - 3 * epsilon
 
     return random.choices([0, 1, 2], weights=probs, k=1)[0]
 
 
-for i in range(0, 100):
+for i in range(0, 50):
     # per episode
     total_reward = 0
     while True:
@@ -88,9 +98,10 @@ for i in range(0, 100):
         total_reward += reward
         if is_done:
             print("episode %d, total reward %d" % (i, total_reward))
+            with open('linear-fa-1.csv', 'a') as f:
+                f.write('%d,%d\n'%(i,total_reward))
             observation = env.reset()
             weights += alpha * (reward - q_hat) * features
-            print(','.join([str(e) for e in weights]))
             break
 
         next_action = epsilon_greedy(weights, next_observation)
@@ -98,3 +109,11 @@ for i in range(0, 100):
         dw = alpha * (target - q_hat) * features
         weights += dw
         observation = next_observation
+
+observation = env.reset()
+for _ in range(1000):
+    env.render()
+    next_observation, reward, is_done, info = env.step(epsilon_greedy(weights, observation))
+    observation = next_observation
+    if is_done:
+        break
