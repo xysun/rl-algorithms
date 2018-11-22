@@ -87,7 +87,7 @@ def epsilon_greedy(weights, observation, greedy = False):
     return random.choices([0, 1, 2], weights=probs, k=1)[0]
 
 
-for i in range(0, 50):
+for i in range(0, 100):
     # per episode
     total_reward = 0
     while True:
