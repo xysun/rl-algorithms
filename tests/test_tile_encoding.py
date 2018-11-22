@@ -40,6 +40,24 @@ class TestTileEncoderModule(unittest.TestCase):
 
         self.assertTrue(np.array_equal(encoder.encode(3.2, 3.2), np.array([0, 1, 0, 1])))
 
+    def test_boundary_cutoff(self):
+        encoder = SingleTileEncoder(
+            lower_x=0,
+            lower_y=0,
+            upper_x=1,
+            upper_y=1,
+            n=3
+        )
+
+        '''
+        this test is to test the boundary cutoff, in this case 0, 0.33, 0.667
+        and the labels for one hot encoder is "0.00", "0.33", "0.67"
+        so just make sure we use the numerical cutoffs, instead of string labels
+        '''
+
+        result = encoder.encode(0.668, 0)
+        self.assertTrue(np.array_equal(result, np.array([0, 0, 1, 1, 0, 0])))
+
     def test_uniform_offset(self):
         encoder = TileEncoder(
             lower_x=0,

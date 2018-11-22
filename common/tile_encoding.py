@@ -2,10 +2,10 @@
 Class constructors:
     - a 2D continuous space: ([lower_x, lower_y], [upper_x, upper_y])
     - grid_size n: each tile will cover 1/n of bounded distance in each dimension
-    - tile offsets [(x,y)]:
+    - tile offsets [(x,y)]
 methods:
-    - `encode((x,y))`: return a (n*n*d) dimension numpy vector with one hot encoding for each tile,
-        where `d` is number of tiles, which is inferred from n and tile offset
+    - `encode((x,y))`: return a (n*d) dimension numpy vector with one hot encoding for each tile,
+        where `n` is number of tiles, d is from one hot encoding
 
 Boundaries are detected with [), i.e. closed on left, open on right
 '''
@@ -33,10 +33,11 @@ class TileEncoder(object):
                 )
             )
 
+        self.d = n * 2 * (1+len(tile_offsets))
+
     def encode(self, x, y):
 
         return np.array([ohc.encode(x, y) for ohc in self.encoders])
-
 
 
 class SingleTileEncoder(object):
