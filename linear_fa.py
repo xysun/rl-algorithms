@@ -61,8 +61,8 @@ action_encoder.fit([[0], [1], [2]])
 
 observation = env.reset()
 
-weights = np.full(tile_encoder.d * env.action_space.n, 0.01)
-alpha = 0.1
+weights = np.full(tile_encoder.d * env.action_space.n, 1.)
+alpha = 0.03
 gamma = 1
 
 
@@ -72,9 +72,9 @@ def q(weights, observation, action):
     return np.dot(weights, features)
 
 
-def epsilon_greedy(weights, observation, greedy = False):
+def epsilon_greedy(weights, observation, decay = 0, greedy = False):
     q_values = [q(weights, observation, action) for action in [0, 1, 2]]
-    epsilon = 0.1
+    epsilon = 0.1 * (1 - decay/10.)
 
     most_greedy_action: int = np.argmax(q_values)
 
@@ -87,11 +87,11 @@ def epsilon_greedy(weights, observation, greedy = False):
     return random.choices([0, 1, 2], weights=probs, k=1)[0]
 
 
-for i in range(0, 100):
+for i in range(0, 110):
     # per episode
     total_reward = 0
     while True:
-        action = epsilon_greedy(weights, observation)
+        action = epsilon_greedy(weights, observation, decay= i % 10)
         q_hat = q(weights, observation, action)
         features = derive_features(observation, action)
         next_observation, reward, is_done, info = env.step(action)
@@ -104,7 +104,7 @@ for i in range(0, 100):
             weights += alpha * (reward - q_hat) * features
             break
 
-        next_action = epsilon_greedy(weights, next_observation)
+        next_action = epsilon_greedy(weights, next_observation, decay= i % 10)
         target = reward + gamma * q(weights, next_observation, next_action)
         dw = alpha * (target - q_hat) * features
         weights += dw
@@ -113,7 +113,7 @@ for i in range(0, 100):
 observation = env.reset()
 for _ in range(1000):
     env.render()
-    next_observation, reward, is_done, info = env.step(epsilon_greedy(weights, observation))
+    next_observation, reward, is_done, info = env.step(epsilon_greedy(weights, observation, greedy=True))
     observation = next_observation
     if is_done:
         break
