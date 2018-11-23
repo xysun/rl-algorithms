@@ -1,27 +1,23 @@
 '''
 solve mountain car with linear function approximation
 
-command line options:
+options:
     - sarsa or q learning
     - uniform or asymmetric tilings
-    - whether use epsilon-greedy or not
-compare the performance of all these options (#iterations to solve, variance), and write a blog
-and report back to this issue: https://github.com/dennybritz/reinforcement-learning/issues/76
+
+https://github.com/dennybritz/reinforcement-learning/issues/76
 
 environment:
     - state: (position: [-1.2, 0.6], velocity ([-0.07, 0.07]))
     - action: [0,1,2]
     - reward: -1.0 per step
-    - q(s,a): 8 tilings + 1 action, dimension = 9
+    - q(s,a): 8 tilings for each action
+
 algorithm:
 - loss = (target - q(s,a)) ^ 2
 - where target = R + gamma * q(s', a')
 - delta_w = alpha * (target - q(s, a)) * x(s,a)
 
-experience replay?
-
-fix weights -> collect a batch of experience -> train SGD -> update weights -> repeat
-solution: call clf.predict on 3 actions, pick max
 '''
 import random
 
