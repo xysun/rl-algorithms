@@ -2,6 +2,7 @@ import random
 
 import numpy as np
 
+
 def epsilon_greedy_policy(q, observation, epsilon=0.05, greedy=False):
     '''
     :param
@@ -19,6 +20,7 @@ def epsilon_greedy_policy(q, observation, epsilon=0.05, greedy=False):
     weights[most_greedy_action] += 1 - actions_count*epsilon
 
     return random.choices(list(range(actions_count)), weights=weights, k=1)[0]
+
 
 def epsilon_decay(starting_epsilon, iterations, i):
     '''
