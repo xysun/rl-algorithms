@@ -1,5 +1,5 @@
 '''
-solve mountain car with linear function approximation
+solve mountain car with linear function approximation with sklearn's SGDRegressor
 
 options:
     - sarsa or q learning
@@ -12,33 +12,21 @@ environment:
     - action: [0,1,2]
     - reward: -1.0 per step
     - q(s,a): 8 tilings for each action
-
-algorithm:
-- loss = (target - q(s,a)) ^ 2
-- where target = R + gamma * q(s', a')
-- delta_w = alpha * (target - q(s, a)) * x(s,a)
-
 '''
+
 import random
 
 import gym
 import numpy as np
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.linear_model import SGDRegressor
 
 from common.tile_encoding import TileEncoder
 
-
-def derive_features(observation, action):
-    env_features = tile_encoder.encode(observation[0], observation[1])
-    empty_features = np.full(env_features.flatten().shape, 0)
-
-    if action == 0:
-        return np.concatenate((env_features.flatten(), empty_features, empty_features))
-    elif action == 1:
-        return np.concatenate((empty_features, env_features.flatten(), empty_features))
-    else:
-        return np.concatenate((empty_features, empty_features, env_features.flatten()))
-
+estimators = [
+    SGDRegressor(learning_rate='constant', eta0=0.03),
+    SGDRegressor(learning_rate='constant', eta0=0.03),
+    SGDRegressor(learning_rate='constant', eta0=0.03)
+]
 
 env = gym.make('MountainCar-v0').env # to bypass 200 step limit
 
@@ -52,24 +40,26 @@ tile_encoder = TileEncoder(
     tile_offsets=[]
 )
 
-action_encoder = OneHotEncoder(categories='auto')
-action_encoder.fit([[0], [1], [2]])
-
 observation = env.reset()
+for model in estimators:
+    model.partial_fit(
+        [tile_encoder.encode(observation[0], observation[1]).flatten()],
+        [0]
+    )
 
-weights = np.full(tile_encoder.d * env.action_space.n, 1.)
 alpha = 0.03
 gamma = 1
 
 
-def q(weights, observation, action):
-    features = derive_features(observation, action)
-    assert features.shape == weights.shape
-    return np.dot(weights, features)
+def q(observation, action):
+    model = estimators[action]
+    return model.predict([
+        tile_encoder.encode(observation[0], observation[1]).flatten()
+    ])[0]
 
 
-def epsilon_greedy(weights, observation, decay = 0, greedy = False):
-    q_values = [q(weights, observation, action) for action in [0, 1, 2]]
+def epsilon_greedy(observation, decay = 0, greedy = False):
+    q_values = [q(observation, action) for action in [0, 1, 2]]
     epsilon = 0.1 * (1 - decay/10.)
 
     most_greedy_action: int = np.argmax(q_values)
@@ -83,33 +73,43 @@ def epsilon_greedy(weights, observation, decay = 0, greedy = False):
     return random.choices([0, 1, 2], weights=probs, k=1)[0]
 
 
-for i in range(0, 110):
+action = epsilon_greedy(observation, decay= 0)
+
+f = open('linear-fa-1.csv', 'w')
+
+for i in range(0, 100):
     # per episode
     total_reward = 0
+    # k = 0
     while True:
-        action = epsilon_greedy(weights, observation, decay= i % 10)
-        q_hat = q(weights, observation, action)
-        features = derive_features(observation, action)
+        # k += 1
+        # if k % 100 == 0:
+        #     print("step %d for episode %d" % (k, i))
+        q_hat = q(observation, action)
         next_observation, reward, is_done, info = env.step(action)
         total_reward += reward
         if is_done:
             print("episode %d, total reward %d" % (i, total_reward))
-            with open('linear-fa-1.csv', 'a') as f:
-                f.write('%d,%d\n'%(i,total_reward))
+            f.write('%d,%d\n'%(i,total_reward))
             observation = env.reset()
-            weights += alpha * (reward - q_hat) * features
             break
 
-        next_action = epsilon_greedy(weights, next_observation, decay= i % 10)
-        target = reward + gamma * q(weights, next_observation, next_action)
-        dw = alpha * (target - q_hat) * features
-        weights += dw
+        next_action = epsilon_greedy(next_observation, decay= i % 10) # SARSA
+        target = reward + gamma * q(next_observation, next_action) # SARSA
+        # target = reward + gamma * np.max(np.array([q(next_observation, a) for a in [0,1,2]])) # Q-learning
+        estimators[action].partial_fit([
+            tile_encoder.encode(observation[0], observation[1]).flatten()
+        ],[target])
         observation = next_observation
+        action = next_action #SARSA
+        # action = epsilon_greedy(next_observation, decay= i % 10) # Q-learning
+
+f.close()
 
 observation = env.reset()
 for _ in range(1000):
     env.render()
-    next_observation, reward, is_done, info = env.step(epsilon_greedy(weights, observation, greedy=True))
+    next_observation, reward, is_done, info = env.step(epsilon_greedy(observation, greedy=True))
     observation = next_observation
     if is_done:
         break
