@@ -1,11 +1,9 @@
 '''
-solve mountain car with linear function approximation with sklearn's SGDRegressor
+solve mountain car with linear function approximation with sklearn's SGDRegressor and tile encoding
 
 options:
     - sarsa or q learning
     - uniform or asymmetric tilings
-
-https://github.com/dennybritz/reinforcement-learning/issues/76
 
 environment:
     - state: (position: [-1.2, 0.6], velocity ([-0.07, 0.07]))
@@ -100,7 +98,6 @@ class LinearFA(object):
                 if mode == 'sarsa':
                     next_action = self.get_epsilon_greedy_action(next_observation, decay=i % 10)
                     target = reward + gamma * self.q(next_observation, next_action)
-                    action = next_action
                 else:
                     target = reward + gamma * np.max(np.array([self.q(next_observation, a) for a in [0, 1, 2]]))
 
@@ -109,7 +106,9 @@ class LinearFA(object):
                 ], [target])
 
                 observation = next_observation
-                if mode == 'q-learning':
+                if mode == 'sarsa':
+                    action = next_action
+                else:
                     action = self.get_epsilon_greedy_action(next_observation, decay=i % 10)
 
         if record_output:
