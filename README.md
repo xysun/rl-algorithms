@@ -2,7 +2,7 @@ Collection of my implementation of reinforcement learning algorithms
 
 In reverse chronological order:
 
-- [Linear function approximation with mountain car](https://github.com/xysun/rl-algorithms/blob/master/linear_fa_mountain_car.py)
+- [Linear function approximation with mountain car, with my own tile encoding implementation](https://github.com/xysun/rl-algorithms/blob/master/linear_fa_mountain_car.py)
 ![img](images/linear-fa-mountain-car.png)
     - learning rate is important
     - epsilon decay is important
