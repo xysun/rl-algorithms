@@ -5,7 +5,7 @@ In reverse chronological order:
 - [REINFOCE with continuous action](https://github.com/xysun/rl-algorithms/blob/master/reinforce_continuous.py)
     - Parametralize mean and standard deviation of a normal distribution
     - mean is linear model; standard deviation is `exp(linear)`
-    - Does not seem to converge :( Although the solution given [here](https://github.com/dennybritz/reinforcement-learning/blob/master/PolicyGradient/Continuous%20MountainCar%20Actor%20Critic%20Solution.ipynb) does not converge either; perhaps it's policy gradient's fault /shrugs
+    - Does not seem to converge as of episode 1000 :( Although the solution given [here](https://github.com/dennybritz/reinforcement-learning/blob/master/PolicyGradient/Continuous%20MountainCar%20Actor%20Critic%20Solution.ipynb) does not converge either :shrug:
 - [actor-critic with CartPole](https://github.com/xysun/rl-algorithms/blob/master/actor_critic.py)
     - Important to use a powerful enough function approximator for value critic
 - [REINFORCE with CartPole](https://github.com/xysun/rl-algorithms/blob/master/reinforce.py)
