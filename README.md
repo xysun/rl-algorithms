@@ -2,6 +2,10 @@ Collection of my implementation of reinforcement learning algorithms
 
 In reverse chronological order:
 
+- [REINFORCE with CartPole](https://github.com/xysun/rl-algorithms/blob/master/reinforce.py)
+![img](images/reinforce-cartpole.png)
+    - In Bernoulli output: `sigmoid(y) !== P(y)`; instead, `P(y) = sigmoid((2y-1)z)`, where `z` is output of linear unit
+    - auto gradient FTW! \o/
 - [Linear function approximation with mountain car](https://github.com/xysun/rl-algorithms/blob/master/linear_fa_mountain_car.py)
 ![img](images/linear-fa-mountain-car.png)
     - learning rate is important
