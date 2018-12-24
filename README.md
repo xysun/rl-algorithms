@@ -2,6 +2,8 @@ Collection of my implementation of reinforcement learning algorithms
 
 In reverse chronological order:
 
+- [actor-critic with CartPole](https://github.com/xysun/rl-algorithms/blob/master/actor_critic.py)
+    - Important to use a powerful enough function approximator for value critic
 - [REINFORCE with CartPole](https://github.com/xysun/rl-algorithms/blob/master/reinforce.py)
     - ![img](images/reinforce-cartpole.png)
     - In Bernoulli output: `sigmoid(y) !== P(y)`; instead, `P(y) = sigmoid((2y-1)z)`, where `z` is output of linear unit
