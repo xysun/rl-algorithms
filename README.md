@@ -6,7 +6,7 @@ In reverse chronological order:
 ![img](images/reinforce-cartpole.png)
     - In Bernoulli output: `sigmoid(y) !== P(y)`; instead, `P(y) = sigmoid((2y-1)z)`, where `z` is output of linear unit
     - auto gradient FTW! \o/
-- [Linear function approximation with mountain car](https://github.com/xysun/rl-algorithms/blob/master/linear_fa_mountain_car.py)
+- [Linear function approximation with mountain car, with my own tile encoding implementation](https://github.com/xysun/rl-algorithms/blob/master/linear_fa_mountain_car.py)
 ![img](images/linear-fa-mountain-car.png)
     - learning rate is important
     - epsilon decay is important
