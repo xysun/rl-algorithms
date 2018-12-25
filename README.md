@@ -1,6 +1,6 @@
 Collection of my implementation of reinforcement learning algorithms
 
-In reverse chronological order:
+## Classical RL algorithms:
 
 - [REINFOCE with continuous action](https://github.com/xysun/rl-algorithms/blob/master/reinforce_continuous.py)
     - Parametralize mean and standard deviation of a normal distribution
