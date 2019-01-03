@@ -70,18 +70,22 @@ class DQNAgent:
             train_op = optimiser.minimize(loss=loss, global_step=tf.train.get_global_step())
             return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
-    def predict_q_values(self, state, epsilon):
-        # epsilon-greedy todo: epsilon decay
+    def predict_q_values(self, state):
+        input_fn = tf.estimator.inputs.numpy_input_fn(
+            x={'x': np.reshape(state, (1, self.env.observation_space.shape[0]))}, batch_size=1,
+            shuffle=False)
+        return self._classifier.predict(input_fn).__next__()
+
+    def action(self, state, epsilon):
+        # todo: epsilon decay
+        predicted_q_values = self.predict_q_values(state)
         if random.random() <= epsilon:
             return random.choice(range(0, self.env.action_space.n))
         else:
-            input_fn = tf.estimator.inputs.numpy_input_fn(
-                x={'x': np.reshape(state, (1, self.env.observation_space.shape[0]))}, batch_size=1,
-                shuffle=False)
-            return self._classifier.predict(input_fn).__next__()
+            return np.argmax(predicted_q_values)
 
     def train(self, x, y):
-        # todo: log loss
+        # todo: print loss
         input_fn = tf.estimator.inputs.numpy_input_fn(x={'x': x}, y=y, batch_size=BATCH_SIZE, num_epochs=1,
                                                       shuffle=True)  # todo: epoch = 1?
         self._classifier.train(input_fn, steps=1)
@@ -96,7 +100,7 @@ def main(args):
     # first we accumulate experience under uniformly random policy
     state = agent.env.reset()
     while agent.experience_memory.size() < REPLAY_START_SIZE:
-        action = np.argmax(agent.predict_q_values(state, epsilon=1))
+        action = agent.action(state, epsilon=1)
         next_state, reward, is_done, info = agent.env.step(action)
         experience = Experience(state, action, reward, next_state, is_done)
         agent.experience_memory.store(experience)
@@ -113,7 +117,7 @@ def main(args):
         while not is_done:
             if update_counter < UPDATE_FREQUENCY:
                 update_counter += 1
-                action = np.argmax(agent.predict_q_values(state, epsilon=0.1))
+                action = agent.action(state, epsilon=0.1)
                 next_state, reward, is_done, info = agent.env.step(action)
                 rewards += reward
                 experience = Experience(state, action, reward, next_state, is_done)
@@ -129,7 +133,7 @@ def main(args):
                     if e.terminal:
                         y.append(e.reward)
                     else:
-                        y.append(e.reward + GAMMA * np.max(agent.predict_q_values(e.next_state, epsilon=1)))
+                        y.append(e.reward + GAMMA * np.max(agent.predict_q_values(e.next_state)))
                 y = np.asarray(y)
                 agent.train(x, y)
 
