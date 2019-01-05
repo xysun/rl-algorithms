@@ -7,23 +7,33 @@ for Breakout, preprocess to 84x84x4
 '''
 import getopt
 import random
-from collections import namedtuple, deque
+import time
+from collections import deque
 
 import gym
 import numpy as np
 import tensorflow as tf
 
 # hyper parameters
-REPLAY_MEMORY_SIZE = 200
+REPLAY_MEMORY_SIZE = 2000
 REPLAY_START_SIZE = 100
 BATCH_SIZE = 32
-EPISODES = 10
-FINAL_EXPLORATION_FRAME = 5
+EPISODES = 500
+FINAL_EXPLORATION_FRAME = 100
 GAMMA = 0.99
-EPOCHS_PER_STEP = 1
+EPOCHS_PER_STEP = 10  # this does not affect training time significantly
+UPDATE_FREQUENCY = 3
 
-Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state',
-                                       'terminal'])  # `terminal` indicates whether `next_state` is terminal
+
+class Experience:
+    # not using namedtuple because we will update `next_state_max_q`
+    def __init__(self, state, action, reward, next_state, terminal, next_state_max_q):
+        self.state = state
+        self.action = action
+        self.reward = reward
+        self.next_state = next_state
+        self.terminal = terminal
+        self.next_state_max_q = next_state_max_q
 
 
 class ExperienceMemory:
@@ -68,9 +78,10 @@ class DQNAgent:
         loss = tf.losses.mean_squared_error(labels=labels, predictions=tf.math.reduce_max(qs, axis=1))
         tf.summary.scalar('loss', loss)
 
+        optimiser = tf.train.AdamOptimizer()
+        train_op = optimiser.minimize(loss=loss, global_step=tf.train.get_global_step())
+
         if mode == tf.estimator.ModeKeys.TRAIN:
-            optimiser = tf.train.AdamOptimizer()
-            train_op = optimiser.minimize(loss=loss, global_step=tf.train.get_global_step())
             return tf.estimator.EstimatorSpec(mode=mode, loss=loss,
                                               train_op=train_op)
 
@@ -80,8 +91,9 @@ class DQNAgent:
             shuffle=False)
         return self._classifier.predict(input_fn).__next__()
 
-    def action(self, state, epsilon):
-        predicted_q_values = self.predict_q_values(state)
+    def action(self, state, epsilon, predicted_q_values=None):
+        if predicted_q_values is None:
+            predicted_q_values = self.predict_q_values(state)
         if random.random() <= epsilon:
             return random.choice(range(0, self.env.action_space.n))
         else:
@@ -102,17 +114,28 @@ def main(args):
 
     # first we accumulate experience under uniformly random policy
     state = agent.env.reset()
+    previous_experience = None
     while agent.experience_memory.size() < REPLAY_START_SIZE:
-        action = agent.action(state, epsilon=1)
+        predicted_q_values = agent.predict_q_values(state)
+        action = agent.action(state, epsilon=1, predicted_q_values=predicted_q_values)
         next_state, reward, is_done, info = agent.env.step(action)
-        experience = Experience(state, action, reward, next_state, is_done)
-        agent.experience_memory.store(experience)
+
+        if previous_experience is not None:
+            assert np.array_equal(previous_experience.next_state, state)
+            assert previous_experience.next_state_max_q is None
+            previous_experience.next_state_max_q = np.argmax(predicted_q_values)
+            agent.experience_memory.store(previous_experience)
+
+        previous_experience = Experience(state, action, reward, next_state, is_done, next_state_max_q=None)
         state = next_state
         if is_done:
+            previous_experience.next_state_max_q = 0
+            agent.experience_memory.store(previous_experience)
+            previous_experience = None
             state = agent.env.reset()
 
     print("Starting experience collected")
-    # then we start training todo why is it so slow
+    # then we start training
     for i in range(EPISODES):
         state = agent.env.reset()
         is_done = False
@@ -120,35 +143,57 @@ def main(args):
         if i >= FINAL_EXPLORATION_FRAME:
             epsilon = 0.1
         else:
-            epsilon = 1 - 0.9 / FINAL_EXPLORATION_FRAME * i
+            epsilon = 1 - 0.9 / (EPISODES - FINAL_EXPLORATION_FRAME) * i
+
+        updates = 0
+        previous_experience = None
         while not is_done:
-            action = agent.action(state, epsilon=epsilon)
-            next_state, reward, is_done, info = agent.env.step(action)
-            rewards += reward
-            experience = Experience(state, action, reward, next_state, is_done)
-            agent.experience_memory.store(experience)
-            state = next_state
-            # SGD
-            batch = agent.experience_memory.sample(BATCH_SIZE)
-            # prepare x and y
-            x = np.reshape([e.state for e in batch], (BATCH_SIZE, 4))
-            y = []
-            for e in batch:
-                if e.terminal:
-                    y.append(e.reward)
-                else:
-                    y.append(e.reward + GAMMA * np.max(agent.predict_q_values(e.next_state)))
-            y = np.asarray(y)
-            agent.train(x, y)
+            if updates < UPDATE_FREQUENCY:
+                t = time.monotonic()
+                predicted_q_values = agent.predict_q_values(state)
+                action = agent.action(state, epsilon=epsilon, predicted_q_values=predicted_q_values)
+                next_state, reward, is_done, info = agent.env.step(action)
+                rewards += reward
+
+                if previous_experience is not None:
+                    assert np.array_equal(previous_experience.next_state, state)
+                    assert previous_experience.next_state_max_q is None
+                    previous_experience.next_state_max_q = np.argmax(predicted_q_values)
+                    agent.experience_memory.store(previous_experience)
+
+                previous_experience = Experience(state, action, reward, next_state, is_done, next_state_max_q=None)
+                state = next_state
+                if is_done:
+                    previous_experience.next_state_max_q = 0
+                    agent.experience_memory.store(previous_experience)
+                    previous_experience = None
+                # print("Updates time: %.2f" % (time.monotonic() - t))
+            else:
+                t = time.monotonic()
+                # SGD
+                batch = agent.experience_memory.sample(BATCH_SIZE)
+                # prepare x and y
+                x = np.reshape([e.state for e in batch], (BATCH_SIZE, 4))
+                y = []
+                for e in batch:
+                    if e.terminal:
+                        y.append(e.reward)
+                    else:
+                        y.append(e.reward + GAMMA * e.next_state_max_q) # speed up trick so we don't run unnecessarily predictions
+                y = np.asarray(y)
+                agent.train(x, y)
+                # reset
+                updates = 0
+                # print("SGD time: %.2f" % (time.monotonic() - t))
+            updates += 1
 
         print("Episode %d: total rewards = %d, epsilon = %.2f" % (i, rewards, epsilon))
+        with open('logs/dqn.csv', 'a') as f:
+            f.write("%d,%d\n" % (i, rewards))
 
     # todo then we save the weights and render
 
-    # debug on
-    print("Experience replay buffer size:", agent.experience_memory.size())
-    print(agent.experience_memory.sample(1))
-    # debug off
+
 
 
 if __name__ == '__main__':
