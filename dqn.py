@@ -108,14 +108,16 @@ class DQNAgent:
 
 def render(args):
     agent = DQNAgent('CartPole-v1')
-    state = agent.env.reset()
-    is_done = False
-    rewards = 0
-    while not is_done:
-        action = agent.action(state, epsilon=0.01)
-        next_state, reward, is_done, info = agent.env.step(action)
-        rewards += reward
-    print("Total rewards: %d" % reward)
+    for i in range(10):
+        state = agent.env.reset()
+        is_done = False
+        rewards = 0
+        while not is_done:
+            action = agent.action(state, epsilon=0.01)
+            next_state, reward, is_done, info = agent.env.step(action)
+            rewards += reward
+            state = next_state
+        print("Total rewards: %d" % rewards)
 
 
 def main(args):
