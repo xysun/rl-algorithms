@@ -15,13 +15,13 @@ import numpy as np
 import tensorflow as tf
 
 # hyper parameters
-REPLAY_MEMORY_SIZE = 2000
-REPLAY_START_SIZE = 100
+REPLAY_MEMORY_SIZE = 10000
+REPLAY_START_SIZE = 1000
 BATCH_SIZE = 32
-EPISODES = 500
+EPISODES = 300
 FINAL_EXPLORATION_FRAME = 100
 GAMMA = 0.99
-EPOCHS_PER_STEP = 10  # this does not affect training time significantly
+EPOCHS_PER_STEP = 5  # this does not affect training time significantly
 UPDATE_FREQUENCY = 3
 
 
@@ -106,6 +106,18 @@ class DQNAgent:
         self._classifier.train(input_fn, steps=1)
 
 
+def render(args):
+    agent = DQNAgent('CartPole-v1')
+    state = agent.env.reset()
+    is_done = False
+    rewards = 0
+    while not is_done:
+        action = agent.action(state, epsilon=0.01)
+        next_state, reward, is_done, info = agent.env.step(action)
+        rewards += reward
+    print("Total rewards: %d" % reward)
+
+
 def main(args):
     ops, _ = getopt.getopt(args[1:], '', longopts=['env='])
     env_name = ops[0][1]
@@ -123,7 +135,7 @@ def main(args):
         if previous_experience is not None:
             assert np.array_equal(previous_experience.next_state, state)
             assert previous_experience.next_state_max_q is None
-            previous_experience.next_state_max_q = np.argmax(predicted_q_values)
+            previous_experience.next_state_max_q = np.max(predicted_q_values)
             agent.experience_memory.store(previous_experience)
 
         previous_experience = Experience(state, action, reward, next_state, is_done, next_state_max_q=None)
@@ -158,7 +170,7 @@ def main(args):
                 if previous_experience is not None:
                     assert np.array_equal(previous_experience.next_state, state)
                     assert previous_experience.next_state_max_q is None
-                    previous_experience.next_state_max_q = np.argmax(predicted_q_values)
+                    previous_experience.next_state_max_q = np.max(predicted_q_values)
                     agent.experience_memory.store(previous_experience)
 
                 previous_experience = Experience(state, action, reward, next_state, is_done, next_state_max_q=None)
@@ -191,10 +203,7 @@ def main(args):
         with open('logs/dqn.csv', 'a') as f:
             f.write("%d,%d\n" % (i, rewards))
 
-    # todo then we save the weights and render
-
-
-
 
 if __name__ == '__main__':
-    tf.app.run()
+    tf.app.run() # train
+    # tf.app.run(main=render)
