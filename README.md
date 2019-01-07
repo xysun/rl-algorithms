@@ -2,7 +2,7 @@ Collection of my implementation of reinforcement learning algorithms
 
 ## Deep RL
 
-- [DQN](https://github.com/xysun/rl-algorithms/blob/master/reinforce_continuous.py)
+- [DQN](https://github.com/xysun/rl-algorithms/blob/master/dqn.py)
     - Let Tensorflow do as much batch processing as possible (eg. I was doing individual inference sequentially for a training batch, lots of time wasted)
     - During TD target update, must use network's **current** weight for `Q_s(t+1)`, instead of the weight during that particular observation.
     - I can probably tune it to learn faster (eg. epsilon decay schedule + architecture), may come back to this later.
