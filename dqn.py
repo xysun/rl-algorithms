@@ -27,7 +27,7 @@ import numpy as np
 import tensorflow as tf
 
 # hyper parameters
-REPLAY_MEMORY_SIZE = 5000
+REPLAY_MEMORY_SIZE = 100000
 REPLAY_START_SIZE = 64
 BATCH_SIZE = 64
 EPISODES = 1000
@@ -36,6 +36,7 @@ GAMMA = 0.99
 EPOCHS_PER_STEP = 1
 MODEL_DIR = 'tf_processing/dqn'
 VALIDATION_DIR = 'tf_processing/dqn_validation'
+UPDATE_FREQUENCY = 3
 
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'terminal'])
 
@@ -179,25 +180,26 @@ def main(args):
                 experience = Experience(state, action, reward, next_state, is_done)
                 agent.experience_memory.store(experience)
                 state = next_state
-                # SGD
-                batch = agent.experience_memory.sample(BATCH_SIZE)
-                # prepare x and y
-                # t = time.monotonic()
-                x = np.reshape([e.state for e in batch], (BATCH_SIZE, agent.OBSERVATION_SPACE_N))
-                next_states = np.reshape([e.next_state for e in batch], (BATCH_SIZE, agent.OBSERVATION_SPACE_N))
-                next_states_q_values = agent.predict_q_values(next_states)
-                y = []
-                for e in batch:
-                    qs = next(next_states_q_values)
-                    assert qs is not None
-                    if e.terminal:
-                        y.append(e.reward)
-                    else:
-                        y.append(e.reward + GAMMA * np.max(qs))
-                y = np.asarray(y)
-                assert next(next_states_q_values, "empty") == "empty"
-                # print("inference time: %.2f" % (time.monotonic() - t))
-                agent.train(x, y)
+                if rewards % UPDATE_FREQUENCY == 0:
+                    # SGD
+                    batch = agent.experience_memory.sample(BATCH_SIZE)
+                    # prepare x and y
+                    # t = time.monotonic()
+                    x = np.reshape([e.state for e in batch], (BATCH_SIZE, agent.OBSERVATION_SPACE_N))
+                    next_states = np.reshape([e.next_state for e in batch], (BATCH_SIZE, agent.OBSERVATION_SPACE_N))
+                    next_states_q_values = agent.predict_q_values(next_states)
+                    y = []
+                    for e in batch:
+                        qs = next(next_states_q_values)
+                        assert qs is not None
+                        if e.terminal:
+                            y.append(e.reward)
+                        else:
+                            y.append(e.reward + GAMMA * np.max(qs))
+                    y = np.asarray(y)
+                    assert next(next_states_q_values, "empty") == "empty"
+                    # print("inference time: %.2f" % (time.monotonic() - t))
+                    agent.train(x, y)
 
             print("Episode %d: total rewards = %d, epsilon = %.2f, size of replay memory %d" % (
                 i, rewards, epsilon, agent.experience_memory.size()))
