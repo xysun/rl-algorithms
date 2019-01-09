@@ -7,6 +7,8 @@ Collection of my implementation of reinforcement learning algorithms
     - Let Tensorflow do as much batch processing as possible (I was doing individual inference sequentially for a training batch, lots of time wasted)
     - During Q target update, must use network's **current** weight for `Q_s(t+1)`, instead of the weight during that particular observation.
     - Provide all action space to training! `MSE(q_update, max(prediction))` is wrong, because the `max(prediction)` can be from a different action than what was recorded in experience and was used for Q update.
+    - Smoothed performance over episodes: (lighter blue line is unsmoothed) 
+        ![img](images/dqn-cartpole.png)
 
 ## Classical RL:
 
