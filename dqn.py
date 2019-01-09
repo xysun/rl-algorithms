@@ -6,8 +6,7 @@ Notes:
 - for Breakout, preprocess to 84x84x4
 
 Architecture:
-- for CartPole, just one layer feedforward of 24 units
-- Linear epsilon decay starting from 0.5
+- for CartPole, 2 layers of feedforward with 24 units each
 
 To run on a fresh instance (with numpy + tensorflow + gym installed)
 
@@ -19,7 +18,7 @@ TF_CPP_MIN_LOG_LEVEL="3" python3 dqn.py --env=CartPole-v1
 '''
 import getopt
 import random
-import time
+import sys
 from collections import deque, namedtuple
 
 import gym
@@ -31,16 +30,15 @@ REPLAY_MEMORY_SIZE = 100000
 REPLAY_START_SIZE = 64
 BATCH_SIZE = 64
 EPISODES = 1000
-FINAL_EXPLORATION_FRAME = 100
+EPSILON_DECAY = 0.96
+STARTING_EPSILON = 1
+FINAL_EPSILON = 0.05
 GAMMA = 0.99
 EPOCHS_PER_STEP = 1
 MODEL_DIR = 'tf_processing/dqn'
 VALIDATION_DIR = 'tf_processing/dqn_validation'
-UPDATE_FREQUENCY = 3
 
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'terminal'])
-
-random.seed(42)
 
 
 class ExperienceMemory:
@@ -81,16 +79,16 @@ class DQNAgent:
         '''
         input_layer = tf.reshape(features['x'], [-1, 4])  # hard code 4 is ok since this is only used for CartPole
         dense1 = tf.layers.dense(inputs=input_layer, units=24, activation=tf.nn.relu)
-        # dense2 = tf.layers.dense(inputs=dense1, units=16, activation=tf.nn.relu)
-        qs = tf.layers.dense(inputs=dense1, units=2)
+        dense2 = tf.layers.dense(inputs=dense1, units=24, activation=tf.nn.relu)
+        qs = tf.layers.dense(inputs=dense2, units=2)
 
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(mode=mode, predictions=qs)
 
         if mode == tf.estimator.ModeKeys.TRAIN:
-            loss = tf.losses.mean_squared_error(labels=labels, predictions=tf.math.reduce_max(qs, axis=1))
+            loss = tf.losses.mean_squared_error(labels=labels, predictions=qs)
             tf.summary.scalar('loss', loss)
-            optimiser = tf.train.AdamOptimizer()
+            optimiser = tf.train.AdamOptimizer(learning_rate=0.0005)
             train_op = optimiser.minimize(loss=loss, global_step=tf.train.get_global_step())
             return tf.estimator.EstimatorSpec(mode=mode, loss=loss,
                                               train_op=train_op)
@@ -102,14 +100,13 @@ class DQNAgent:
         return self._classifier.predict(input_fn)
 
     def action(self, state, epsilon):
-        q_values = self.predict_q_values(np.reshape(state, (1, self.OBSERVATION_SPACE_N)))
-        predicted_q_values = next(q_values)
-        assert predicted_q_values is not None
-        assert next(q_values, "empty") == "empty"  # test exhausted
+        q_values = list(self.predict_q_values(np.reshape(state, (1, self.OBSERVATION_SPACE_N))))
+        assert len(q_values) == 1
         if random.random() <= epsilon:
             return random.choice(range(0, self.env.action_space.n))
         else:
-            return np.argmax(predicted_q_values)
+            assert q_values[0].shape[0] == 2
+            return np.argmax(q_values[0])
 
     def train(self, x, y):
         input_fn = tf.estimator.inputs.numpy_input_fn(x={'x': x}, y=y, batch_size=BATCH_SIZE,
@@ -129,15 +126,17 @@ def main(args):
     while agent.experience_memory.size() < REPLAY_START_SIZE:
         action = agent.action(state, epsilon=1)
         next_state, reward, is_done, info = agent.env.step(action)
-        experience = Experience(state, action, reward, next_state, is_done)
+        reward_to_record = -999 if is_done else reward
+        experience = Experience(state, action, reward_to_record, next_state, is_done)
         agent.experience_memory.store(experience)
         state = next_state
         if is_done:
             state = agent.env.reset()
 
     print("Starting experience collected")
+    epsilon = STARTING_EPSILON
     # then we start training
-    for i in range(EPISODES):
+    for i in range(1, EPISODES + 1):
         state = agent.env.reset()
         is_done = False
         rewards = 0
@@ -145,13 +144,13 @@ def main(args):
         if i % 10 == 0:
             # validation episode
             total_rewards = 0
-            for j in range(5):
+            for j in range(100):
                 state = agent.env.reset()
                 is_done = False
                 rewards = 0
 
                 while not is_done:
-                    action = agent.action(state, epsilon=0.01)
+                    action = agent.action(state, epsilon=FINAL_EPSILON)
                     next_state, reward, is_done, info = agent.env.step(action)
                     rewards += reward
                     state = next_state
@@ -165,62 +164,58 @@ def main(args):
             summary_writer.flush()
 
             print("Validation episode %d avg reward %.2f" % (i, avg_reward))
+            epsilon = max(FINAL_EPSILON, epsilon * EPSILON_DECAY)
+            if avg_reward > 195:
+                print("Success! Stopping..")
+                sys.exit()
 
         else:
-
-            if i >= EPISODES - FINAL_EXPLORATION_FRAME:
-                epsilon = 0.01
-            else:
-                epsilon = 0.5 * (1 - 0.9 / (EPISODES - FINAL_EXPLORATION_FRAME) * i)
 
             while not is_done:
                 action = agent.action(state, epsilon=epsilon)
                 next_state, reward, is_done, info = agent.env.step(action)
                 rewards += reward
-                experience = Experience(state, action, reward, next_state, is_done)
+
+                reward_to_record = -999 if is_done else reward
+                experience = Experience(state, action, reward_to_record, next_state, is_done)
+
                 agent.experience_memory.store(experience)
                 state = next_state
-                if rewards % UPDATE_FREQUENCY == 0:
-                    # SGD
-                    batch = agent.experience_memory.sample(BATCH_SIZE)
-                    # prepare x and y
-                    # t = time.monotonic()
-                    x = np.reshape([e.state for e in batch], (BATCH_SIZE, agent.OBSERVATION_SPACE_N))
-                    next_states = np.reshape([e.next_state for e in batch], (BATCH_SIZE, agent.OBSERVATION_SPACE_N))
-                    next_states_q_values = agent.predict_q_values(next_states)
-                    y = []
-                    for e in batch:
-                        qs = next(next_states_q_values)
-                        assert qs is not None
-                        if e.terminal:
-                            y.append(e.reward)
-                        else:
-                            y.append(e.reward + GAMMA * np.max(qs))
-                    y = np.asarray(y)
-                    assert next(next_states_q_values, "empty") == "empty"
-                    # print("inference time: %.2f" % (time.monotonic() - t))
-                    agent.train(x, y)
+                # SGD
+                batch = agent.experience_memory.sample(BATCH_SIZE)
+                # prepare x and y
+                # t = time.monotonic()
+                x = np.reshape([e.state for e in batch], (BATCH_SIZE, agent.OBSERVATION_SPACE_N))
+                next_states = np.reshape([e.next_state for e in batch], (BATCH_SIZE, agent.OBSERVATION_SPACE_N))
+                next_states_q_values = list(agent.predict_q_values(next_states))
+                curr_state_q_values = list(agent.predict_q_values(x))
+                assert (len(next_states_q_values) == BATCH_SIZE)
+                assert (len(curr_state_q_values) == BATCH_SIZE)
+                y = []
+                for idx, e in enumerate(batch):
+                    next_qs = next_states_q_values[idx]
+                    curr_qs = curr_state_q_values[idx]
+                    # debug to make sure batch predict preserves input order
+                    # print(next_qs)
+                    # print(next(agent.predict_q_values(np.reshape(e.next_state, (1,4)))))
+                    # print(curr_qs)
+                    # print(next(agent.predict_q_values(np.reshape(e.state, (1, 4)))))
+
+                    # IMPORTANT!
+                    if e.terminal:
+                        curr_qs[e.action] = e.reward
+                    else:
+                        curr_qs[e.action] = e.reward + GAMMA * np.max(next_qs)
+                    y.append(curr_qs)
+                y = np.reshape(np.asarray(y), (BATCH_SIZE, 2))
+                # print("====== step")
+                agent.train(x, y)
 
             print("Episode %d: total rewards = %d, epsilon = %.2f, size of replay memory %d" % (
                 i, rewards, epsilon, agent.experience_memory.size()))
             with open('logs/dqn.csv', 'a') as f:
-                f.write("%d,%d\n" % (i, rewards))
-
-
-def render(args):
-    agent = DQNAgent('CartPole-v1')
-    for i in range(10):
-        state = agent.env.reset()
-        is_done = False
-        rewards = 0
-        while not is_done:
-            action = agent.action(state, epsilon=0.01)
-            next_state, reward, is_done, info = agent.env.step(action)
-            rewards += reward
-            state = next_state
-        print("Total rewards: %d" % rewards)
+                f.write("%d,%d,%.2f\n" % (i, rewards, epsilon))
 
 
 if __name__ == '__main__':
-    tf.app.run()  # train
-    # tf.app.run(main=render)
+    tf.app.run()
